@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Keep alive script to prevent Replit from sleeping.
+Keep alive script to prevent Render from sleeping.
 This script makes periodic requests to the health server.
 """
 
@@ -12,7 +12,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class KeepAlive:
-    def __init__(self, url="http://0.0.0.0:5000/ping", interval=240):
+    def __init__(self, url="http://localhost:5000/ping", interval=240):
         """
         Initialize keep alive service.
         
@@ -76,6 +76,10 @@ if __name__ == "__main__":
         keep_alive = KeepAlive()
         await keep_alive.start_keep_alive()
     
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Keep alive service stopped by user")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
