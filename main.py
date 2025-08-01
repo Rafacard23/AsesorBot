@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def run_health_server():
     """Ejecuta el health server en un hilo separado"""
     port = int(os.getenv('PORT', '5000'))
-    health_server = HealthServer(host="0.0.0.0", port=port)
+    health_server = HealthServer(port=port)
     asyncio.run(health_server.start_server())
 
 async def main():
