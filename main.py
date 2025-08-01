@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def run_health_server():
     """Ejecuta el health server en un hilo separado"""
     port = int(os.getenv('PORT', '5000'))
-    health_server = HealthServer(port=port)
+    health_server = HealthServer(port=port)  # ¡SIN 'host'!
     asyncio.run(health_server.start_server())
 
 async def main():
@@ -49,6 +49,10 @@ async def main():
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
+    await application.idle()
+
+if __name__ == '__main__':
+    asyncio.run(main())
     await application.idle()
 
 if __name__ == '__main__':
