@@ -43,7 +43,7 @@ async def main():
     logger.info("Health server started for UptimeRobot monitoring")  
 
     # Inicia el servicio de keep-alive  
-    start_keep_alive_background()  
+    await start_keep_alive_background()   
     logger.info("Internal keep-alive service started")  
 
     # Crea la aplicación de Telegram  
