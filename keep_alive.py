@@ -12,7 +12,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class KeepAlive:
-    def __init__(self, url="http://localhost:5000/ping", interval=240):
+    def __init__(self, url="http://0.0.0.0:5000/ping", interval=240):
         """
         Initialize keep alive service.
         
