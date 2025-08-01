@@ -236,8 +236,9 @@ async def confirmar_pago_handler(update: Update, context: ContextTypes.DEFAULT_T
         # Send confirmation to user
         session_name = format_session_name(tipo_sesion_elegida)
         mensaje_usuario = (
-            f"¡Perfecto, {nombre_usuario}! Tu {session_name} ha sido confirmada y activada. ✅\n\n"
+            f"¡Perfecto, {nombre_usuario}! Tu pago ha sido confirmado y activado. ✅\n\n"
             f"Ahora puedes hacer todas las preguntas que necesites. Estoy aquí para ayudarte. 😊"
+        
         )
 
         await context.bot.send_message(
