@@ -8,21 +8,26 @@ import asyncio
 import aiohttp
 import logging
 from datetime import datetime
+import os
 
 logger = logging.getLogger(__name__)
 
 class KeepAlive:
-    def __init__(self, url="http://localhost:5000/ping", interval=240):
+    def __init__(self, url=None, interval=240):
         """
         Initialize keep alive service.
         
         Args:
-            url: Health endpoint to ping
+            url: Health endpoint to ping (default: http://127.0.0.1:5000/ping)
             interval: Ping interval in seconds (default: 4 minutes)
         """
-        self.url = url
+        # Usa 127.0.0.1 en lugar de localhost para evitar problemas de resolución DNS
+        # Si PORT está definido en Render, úsalo; de lo contrario, usa 5000
+        port = os.getenv('PORT', '5000')
+        self.url = url or f"http://127.0.0.1:{port}/ping"
         self.interval = interval
         self.running = False
+        self.initial_delay = 10  # Espera 10 segundos antes del primer ping
         
     async def ping_health_server(self):
         """Send a ping to the health server."""
@@ -44,6 +49,10 @@ class KeepAlive:
         """Start the keep alive loop."""
         self.running = True
         logger.info(f"Starting keep alive service, pinging every {self.interval} seconds")
+        
+        # Espera un tiempo inicial para dar tiempo al health server a iniciarse
+        logger.info(f"Waiting {self.initial_delay} seconds before first health ping...")
+        await asyncio.sleep(self.initial_delay)
         
         while self.running:
             try:
@@ -76,10 +85,6 @@ if __name__ == "__main__":
         keep_alive = KeepAlive()
         await keep_alive.start_keep_alive()
     
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Keep alive service stopped by user")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
