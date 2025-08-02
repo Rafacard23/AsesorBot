@@ -85,7 +85,7 @@ def webhook():
 # 4. Inicializar y setear webhook al arrancar
 # -------------------------------------------------
 async def set_webhook():
-    url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TELEGRAM_TOKEN}"
+    url = url = f"https://{os.getenv('KOYEB_PUBLIC_DOMAIN')}/{TELEGRAM_TOKEN}"
     await application.bot.set_webhook(url, drop_pending_updates=True)
     logger.info("Webhook configurado en %s", url)
 
