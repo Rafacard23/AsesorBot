@@ -82,8 +82,19 @@ async def main():
     # Keep the bot alive
     await asyncio.Event().wait()
 
-if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+# ── Código final para Render ──
+if __name__ == "__main__":
+    import asyncio
+
+    async def start_bot():
+        app = Application.builder().token(TELEGRAM_TOKEN).build()
+        # Limpiar cualquier webhook o polling anterior
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        await app.initialize()
+        await app.start()
+        # Iniciar polling limpio
+        await app.updater.start_polling(drop_pending_updates=True)
+        # Mantener el bot activo
+        await asyncio.Event().wait()
+
+    asyncio.run(start_bot())
