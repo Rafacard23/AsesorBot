@@ -1,4 +1,4 @@
-# main.py
+# main.py  – Versión webhook para Render (24/7)
 import os
 import asyncio
 import logging
@@ -7,6 +7,8 @@ import logging
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 
+from flask import Flask, request, abort
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config import TELEGRAM_TOKEN
 from handlers import (
@@ -22,72 +24,73 @@ from handlers import (
     respuesta_rapida_handler,
     admin_status_handler
 )
-from keep_alive import run_flask
-import threading
+from telegram.request import HTTPXRequest
 
-# Configurar logging propio
+# Logging propio
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
-async def main() -> None:
-    """Arranca el bot en Render: keep-alive + polling robusto."""
-    if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN no está configurado.")
-        return
+# -------------------------------------------------
+# 1. Crear la aplicación de Telegram
+# -------------------------------------------------
+request = HTTPXRequest(connect_timeout=15, read_timeout=15)
+application = (
+    Application.builder()
+    .token(TELEGRAM_TOKEN)
+    .request(request)
+    .build()
+)
 
-    # 1. Keep-alive (Flask) en el puerto que asigna Render
-    port = int(os.getenv("PORT", 5000))
-    threading.Thread(
-        target=run_flask,
-        kwargs={"port": port},
-        daemon=True,
-    ).start()
-    logger.info("Keep-alive Flask server iniciado en puerto %s", port)
+# -------------------------------------------------
+# 2. Registrar todos los handlers
+# -------------------------------------------------
+application.add_handler(CommandHandler("start", start_handler))
+application.add_handler(CommandHandler("confirmar_pago", confirmar_pago_handler))
+application.add_handler(CommandHandler("responder", responder_handler))
+application.add_handler(CommandHandler("r", responder_rapido_handler))
+application.add_handler(CommandHandler("pendientes", pendientes_handler))
+application.add_handler(CommandHandler("ultima", ultima_pregunta_handler))
+application.add_handler(CommandHandler("rapida", respuesta_rapida_handler))
+application.add_handler(CommandHandler("admin", admin_status_handler))
+for i in range(1, 10):
+    application.add_handler(CommandHandler(f"r{i}", responder_numerado_handler))
+application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    # 2. Crear la aplicación con mayor timeout para evitar Telegram TimedOut
-    from telegram.request import HTTPXRequest
-    request = HTTPXRequest(connect_timeout=15, read_timeout=15)
-    application = (
-        Application.builder()
-        .token(TELEGRAM_TOKEN)
-        .request(request)
-        .build()
-    )
+# -------------------------------------------------
+# 3. Flask app para webhook y keep-alive
+# -------------------------------------------------
+flask_app = Flask(__name__)
 
-    # 3. Registrar handlers
-    application.add_handler(CommandHandler("start", start_handler))
-    application.add_handler(CommandHandler("confirmar_pago", confirmar_pago_handler))
-    application.add_handler(CommandHandler("responder", responder_handler))
-    application.add_handler(CommandHandler("r", responder_rapido_handler))
-    application.add_handler(CommandHandler("pendientes", pendientes_handler))
-    application.add_handler(CommandHandler("ultima", ultima_pregunta_handler))
-    application.add_handler(CommandHandler("rapida", respuesta_rapida_handler))
-    application.add_handler(CommandHandler("admin", admin_status_handler))
-    for i in range(1, 10):
-        application.add_handler(CommandHandler(f"r{i}", responder_numerado_handler))
-    application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+@flask_app.route("/")
+def ping():
+    return "Bot alive", 200
 
-    # 4. Inicializar, arrancar y polling
-    await application.initialize()
-    await application.start()
-    # Eliminar webhook con re-intentos silenciosos
-    try:
-        await application.bot.delete_webhook(drop_pending_updates=True)
-    except Exception as e:
-        logger.warning("No se pudo delete_webhook: %s", e)
+@flask_app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+def webhook():
+    if request.headers.get("content-type") == "application/json":
+        json_data = request.get_data().decode()
+        update = Update.de_json(json_data, application.bot)
+        asyncio.run_coroutine_threadsafe(
+            application.process_update(update),
+            application.bot.loop
+        )
+        return "", 200
+    abort(403)
 
-    await application.updater.start_polling(
-        poll_interval=2.0,
-        timeout=30,
-        drop_pending_updates=True,
-        allowed_updates=["message", "photo"],
-    )
-    logger.info("Bot iniciado en polling mode")
-    await asyncio.Event().wait()  # Mantener vivo
+# -------------------------------------------------
+# 4. Inicializar y setear webhook al arrancar
+# -------------------------------------------------
+async def set_webhook():
+    url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TELEGRAM_TOKEN}"
+    await application.bot.set_webhook(url, drop_pending_updates=True)
+    logger.info("Webhook configurado en %s", url)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Preparar la app
+    asyncio.run(set_webhook())
+    # Arrancar Flask (Gunicorn se encargará en producción)
+    flask_app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
