@@ -1,0 +1,5 @@
+name: mi-bot-telegram
+runtime: python
+build_command: pip install -r requirements.txt
+run_command: python main.py
+ports: []
